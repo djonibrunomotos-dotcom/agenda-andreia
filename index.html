@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento Andreia Kubichen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <style>
+        :root { --rosa: #f8bbd0; --rosa-escuro: #c48b9f; --pastel: #fff5f8; --texto: #5d4037; --verde: #81c784; --vermelho: #ff8a80; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--pastel); color: var(--texto); margin: 0; padding: 0; }
+        header { background-color: var(--rosa); padding: 1.5rem 1rem; text-align: center; border-radius: 0 0 30px 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .container { padding: 20px; max-width: 500px; margin: auto; }
+        label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; color: var(--rosa-escuro); }
+        
+        /* Estilo do Calendário */
+        #calendar { background: white; padding: 10px; border-radius: 15px; border: 1px solid #eee; margin-bottom: 15px; }
+        .fc-daygrid-day.dia-disponivel { background-color: rgba(129, 199, 132, 0.2); }
+        .fc-daygrid-day.dia-lotado { background-color: rgba(255, 138, 128, 0.4) !important; cursor: not-allowed !important; }
+        .fc-daygrid-day-top { justify-content: center !important; }
+
+        .grade-horarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; display: none; }
+        .hora-item { padding: 10px; background: white; border: 1px solid var(--rosa); border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .hora-item.selected { background: var(--rosa-escuro); color: white; border-color: var(--rosa-escuro); }
+        .hora-item.bloqueado { background: #e0e0e0; color: #9e9e9e; border-color: #bdbdbd; cursor: not-allowed; text-decoration: line-through; }
+        
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-family: 'Poppins'; }
+        .btn-confirmar { width: 100%; background-color: var(--verde); color: white; padding: 15px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        
+        /* Painel Admin */
+        .badge-admin { display: none; background: #ff5252; color: white; padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 10px; text-align: center; font-weight: bold; }
+        #btn-sair-admin, #btn-bloquear-dia { display: none; border: none; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
+        #btn-sair-admin { background: #5d4037; color: white; }
+        #btn-bloquear-dia { background: var(--vermelho); color: white; }
+        .admin-footer { margin-top: 40px; text-align: center; font-size: 0.7rem; color: #ccc; }
+        .btn-admin-link { background: none; border: none; color: #c48b9f; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="font-family: 'Playfair Display'; margin: 0; font-size: 1.6rem;">Agendamento Andreia Kubichen</h1>
+    <p style="margin: 5px 0 0; font-size: 0.9rem;">Agendamento Prático</p>
+</header>
+
+<div class="container">
+    <div id="aviso-admin" class="badge-admin">MODO ADMINISTRATIVO ATIVADO</div>
+    <button id="btn-bloquear-dia" onclick="toggleBloqueioDia()">Bloquear/Liberar Dia Inteiro</button>
+    <button id="btn-sair-admin" onclick="desativarAdmin()">Sair do Modo de Bloqueio</button>
+
+    <label>1. Escolha o dia (Verde = Disponível / Vermelho = Lotado):</label>
+    <div id="calendar"></div>
+
+    <div id="secao-horarios">
+        <label id="label-horario">2. Escolha o horário:</label>
+        <div class="grade-horarios" id="grade-horarios"></div>
+    </div>
+
+    <label>3. Seus dados:</label>
+    <input type="text" id="nome" placeholder="Nome Completo">
+    <input type="tel" id="whatsapp" placeholder="Seu WhatsApp">
+    <select id="servico">
+        <option value="" disabled selected>Selecione o serviço</option>
+        <option value="Mão">Mão</option>
+        <option value="Pé">Pé</option>
+        <option value="Spa dos Pés">Spa dos Pés</option>
+        <option value="Pé e Mão">Pé e Mão</option>
+        <option value="Combo Completo">Pé, Mão e Spa</option>
+    </select>
+
+    <button type="button" class="btn-confirmar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
+
+    <div class="admin-footer">
+        <button class="btn-admin-link" onclick="ativarAdmin()">Acesso Restrito</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/pt-br.js"></script>
+
+<script>
+    var dataSelecionada = "";
+    var horaSelecionada = "";
+    var isAdmin = false;
+    var horariosBase = ["08:30", "09:15", "10:00", "10:45", "11:30", "13:30", "14:15", "15:00", "15:45", "16:30", "17:15"];
+    
+    var bloqueios = JSON.parse(localStorage.getItem('bloqueios_manicure')) || {};
+    var diasLotados = JSON.parse(localStorage.getItem('dias_lotados')) || [];
+    var calendar;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'pt-br',
+            height: 'auto',
+            dayCellClassNames: function(arg) {
+                var dateStr = arg.date.toISOString().split('T')[0];
+                if (diasLotados.includes(dateStr)) { return ['dia-lotado']; }
+                return ['dia-disponivel'];
+            },
+            dateClick: function(info) {
+                if (!isAdmin && diasLotados.includes(info.dateStr)) {
+                    alert("Este dia já está com a agenda lotada.");
+                    return;
+                }
+                dataSelecionada = info.dateStr;
+                atualizarGrade();
+                document.querySelectorAll('.fc-daygrid-day').forEach(el => el.style.border = 'none');
+                info.dayEl.style.border = '2px solid var(--rosa-escuro)';
+            }
+        });
+        calendar.render();
+    });
+
+    function atualizarGrade() {
+        if (!dataSelecionada) return;
+        var grade = document.getElementById('grade-horarios');
+        grade.style.display = 'grid';
+        grade.innerHTML = "";
+        
+        var dataPt = dataSelecionada.split('-').reverse().join('/');
+        
+        horariosBase.forEach(function(h) {
+            var div = document.createElement('div');
+            var chave = dataPt + "_" + h;
+            var estaBloqueado = bloqueios[chave] || diasLotados.includes(dataSelecionada);
+
+            div.className = 'hora-item' + (estaBloqueado ? ' bloqueado' : '');
+            div.innerText = h;
+            
+            div.onclick = function() {
+                if (isAdmin) {
+                    if (bloqueios[chave]) { delete bloqueios[chave]; } 
+                    else { bloqueios[chave] = true; }
+                    localStorage.setItem('bloqueios_manicure', JSON.stringify(bloqueios));
+                    atualizarGrade();
+                } else {
+                    if (estaBloqueado) return;
+                    document.querySelectorAll('.hora-item').forEach(el => el.classList.remove('selected'));
+                    div.classList.add('selected');
+                    horaSelecionada = h;
+                }
+            };
+            grade.appendChild(div);
+        });
+    }
+
+    function toggleBloqueioDia() {
+        if (!dataSelecionada) { alert("Selecione um dia no calendário primeiro."); return; }
+        var index = diasLotados.indexOf(dataSelecionada);
+        if (index > -1) { diasLotados.splice(index, 1); } 
+        else { diasLotados.push(dataSelecionada); }
+        localStorage.setItem('dias_lotados', JSON.stringify(diasLotados));
+        calendar.render();
+        atualizarGrade();
+    }
+
+    function ativarAdmin() {
+        var senha = prompt("Digite a senha:");
+        if (senha === "1234") {
+            isAdmin = true;
+            document.getElementById('aviso-admin').style.display = 'block';
+            document.getElementById('btn-sair-admin').style.display = 'block';
+            document.getElementById('btn-bloquear-dia').style.display = 'block';
+            alert("Modo Admin: Agora você pode bloquear horários ou o DIA INTEIRO.");
+        } else { alert("Senha incorreta."); }
+    }
+
+    function desativarAdmin() {
+        isAdmin = false;
+        document.getElementById('aviso-admin').style.display = 'none';
+        document.getElementById('btn-sair-admin').style.display = 'none';
+        document.getElementById('btn-bloquear-dia').style.display = 'none';
+        calendar.render();
+        atualizarGrade();
+    }
+
+    function enviarAgendamento() {
+        if (isAdmin) { alert("Saia do modo admin para agendar."); return; }
+        var nome = document.getElementById('nome').value;
+        var zap = document.getElementById('whatsapp').value;
+        var servico = document.getElementById('servico').value;
+        if (!nome || !dataSelecionada || !horaSelecionada || !servico) {
+            alert("Preencha tudo corretamente!");
+            return;
+        }
+        var foneMae = "5545988157875"; 
+        var texto = "NOVO AGENDAMENTO ✨\n\n*Cliente:* " + nome + "\n*Serviço:* " + servico + "\n*Data:* " + dataSelecionada.split('-').reverse().join('/') + "\n*Horário:* " + horaSelecionada + "\n*WhatsApp:* " + zap;
+        window.open("https://wa.me/" + foneMae + "?text=" + encodeURIComponent(texto), '_blank');
+    }
+</script>
+</body>
+</html>
