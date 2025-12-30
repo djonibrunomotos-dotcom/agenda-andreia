@@ -72,10 +72,11 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/pt-br.js"></script>
 
 <script>
+    // CONFIGURAÇÃO COM SEU LINK COPIADO
     var firebaseConfig = {
         apiKey: "AIzaSyAMLfQx1ip_-dwFeHzhkT82EUxcZ70G-Sc",
         authDomain: "agendaandreia-d7bd4.firebaseapp.com",
-        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com",
+        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com/",
         projectId: "agendaandreia-d7bd4",
         storageBucket: "agendaandreia-d7bd4.firebasestorage.app",
         messagingSenderId: "188530942210",
@@ -93,7 +94,6 @@
     var diasLotados = [];
     var calendar;
 
-    // Escuta em tempo real qualquer mudança no banco
     db.ref('/').on('value', function(snapshot) {
         var data = snapshot.val() || {};
         bloqueios = data.bloqueios || {};
@@ -111,10 +111,10 @@
             dayCellClassNames: function(arg) {
                 var d = arg.date;
                 var dateStr = d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
-                return diasLotados.includes(dateStr) ? ['dia-lotado'] : ['dia-disponivel'];
+                return (diasLotados && diasLotados.includes(dateStr)) ? ['dia-lotado'] : ['dia-disponivel'];
             },
             dateClick: function(info) {
-                if (!isAdmin && diasLotados.includes(info.dateStr)) {
+                if (!isAdmin && diasLotados && diasLotados.includes(info.dateStr)) {
                     alert("Agenda completa ou fechada para este dia!");
                     return;
                 }
@@ -137,7 +137,7 @@
         horariosBase.forEach(function(h) {
             var div = document.createElement('div');
             var chave = dataPt + "_" + h;
-            var estaBloqueado = bloqueios[chave] || (diasLotados.includes(dataSelecionada) && !isAdmin);
+            var estaBloqueado = bloqueios[chave] || (diasLotados && diasLotados.includes(dataSelecionada) && !isAdmin);
 
             div.className = 'hora-item' + (estaBloqueado ? ' bloqueado' : '');
             div.innerText = h;
@@ -145,11 +145,8 @@
             
             div.onclick = function() {
                 if (isAdmin) {
-                    if (bloqueios[chave]) {
-                        db.ref('bloqueios/' + chave).remove();
-                    } else {
-                        db.ref('bloqueios/' + chave).set(true);
-                    }
+                    if (bloqueios[chave]) db.ref('bloqueios/'+chave).remove();
+                    else db.ref('bloqueios/'+chave).set(true);
                 } else if (!estaBloqueado) {
                     document.querySelectorAll('.hora-item').forEach(el => el.classList.remove('selected'));
                     div.classList.add('selected');
@@ -162,12 +159,10 @@
 
     function toggleBloqueioDia() {
         if (!dataSelecionada) return;
+        if(!diasLotados) diasLotados = [];
         var index = diasLotados.indexOf(dataSelecionada);
-        if (index > -1) {
-            diasLotados.splice(index, 1);
-        } else {
-            diasLotados.push(dataSelecionada);
-        }
+        if (index > -1) diasLotados.splice(index, 1);
+        else diasLotados.push(dataSelecionada);
         db.ref('diasLotados').set(diasLotados);
     }
 
@@ -195,34 +190,28 @@
         var servico = document.getElementById('servico').value;
 
         if (!dataSelecionada || !horaSelecionada || !nome || !servico) {
-            alert("Por favor, preencha todos os campos e escolha data e hora.");
-            return;
+            alert("Preencha seu nome e escolha o serviço."); return;
         }
 
         var btn = document.getElementById('btn-finalizar');
-        btn.innerText = "Salvando...";
+        btn.innerText = "Confirmando...";
         btn.disabled = true;
 
         var dataPt = dataSelecionada.split('-').reverse().join('/');
         var chave = dataPt + "_" + horaSelecionada;
 
-        // COMANDO DE SALVAMENTO PRIORITÁRIO
-        db.ref('bloqueios/' + chave).set(true, function(error) {
-            if (error) {
-                alert("Erro ao salvar agendamento. Tente novamente.");
-                btn.innerText = "Finalizar Agendamento";
-                btn.disabled = false;
-            } else {
-                // SÓ ABRE O WHATSAPP SE SALVOU NO BANCO
-                var texto = "NOVO AGENDAMENTO\n*Cliente:* " + nome + "\n*Serviço:* " + servico + "\n*Data:* " + dataPt + "\n*Horário:* " + horaSelecionada;
-                window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
-                
-                // Reseta para a próxima pessoa
-                btn.innerText = "Finalizar Agendamento";
-                btn.disabled = false;
-                horaSelecionada = "";
-                document.getElementById('nome').value = "";
-            }
+        // GRAVAÇÃO DIRETA
+        db.ref('bloqueios/' + chave).set(true)
+        .then(() => {
+            var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataPt+"\n*Horário:* "+horaSelecionada;
+            window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
+            btn.innerText = "Finalizar Agendamento";
+            btn.disabled = false;
+        })
+        .catch((error) => {
+            alert("Erro ao gravar no banco. Verifique as 'Rules' no Firebase.");
+            btn.innerText = "Finalizar Agendamento";
+            btn.disabled = false;
         });
     }
 </script>
