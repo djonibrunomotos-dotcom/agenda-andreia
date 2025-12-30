@@ -12,21 +12,17 @@
         header { background-color: var(--rosa); padding: 1.5rem 1rem; text-align: center; border-radius: 0 0 30px 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .container { padding: 20px; max-width: 500px; margin: auto; }
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; color: var(--rosa-escuro); }
-        #calendar { background: white; padding: 10px; border-radius: 15px; border: 1px solid #eee; margin-bottom: 15px; min-height: 300px; }
-        .fc-daygrid-day.dia-disponivel { background-color: rgba(129, 199, 132, 0.2); }
+        #calendar { background: white; padding: 10px; border-radius: 15px; border: 1px solid #eee; margin-bottom: 15px; min-height: 350px; }
+        .fc-daygrid-day.dia-disponivel { background-color: rgba(129, 199, 132, 0.1); }
         .fc-daygrid-day.dia-lotado { background-color: rgba(255, 138, 128, 0.4) !important; cursor: not-allowed !important; }
-        .grade-horarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; display: none; }
+        .grade-horarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
         .hora-item { padding: 10px; background: white; border: 1px solid var(--rosa); border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
-        .hora-item.selected { background: var(--rosa-escuro); color: white; border-color: var(--rosa-escuro); }
+        .hora-item.selected { background: var(--rosa-escuro); color: white; }
         .hora-item.bloqueado { background: #e0e0e0; color: #9e9e9e; border-color: #bdbdbd; cursor: not-allowed; text-decoration: line-through; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
         .btn-confirmar { width: 100%; background-color: var(--verde); color: white; padding: 15px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .badge-admin { display: none; background: #ff5252; color: white; padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 10px; text-align: center; font-weight: bold; }
-        #btn-sair-admin, #btn-bloquear-dia { display: none; border: none; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
-        #btn-sair-admin { background: #5d4037; color: white; }
-        #btn-bloquear-dia { background: var(--vermelho); color: white; }
-        .admin-footer { margin-top: 40px; text-align: center; font-size: 0.7rem; color: #ccc; }
-        .btn-admin-link { background: none; border: none; color: #c48b9f; cursor: pointer; text-decoration: underline; }
+        .btn-admin-link { background: none; border: none; color: #c48b9f; cursor: pointer; text-decoration: underline; font-size: 0.7rem; margin-top: 20px; width: 100%; }
+        .badge-admin { display: none; background: #ff5252; color: white; padding: 10px; border-radius: 10px; margin-bottom: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -37,18 +33,14 @@
 
 <div class="container">
     <div id="aviso-admin" class="badge-admin">MODO ADMINISTRATIVO ATIVADO</div>
-    <button id="btn-bloquear-dia" onclick="toggleBloqueioDia()">Bloquear/Liberar Dia Inteiro</button>
-    <button id="btn-sair-admin" onclick="desativarAdmin()">Sair do Modo de Bloqueio</button>
-
-    <label>1. Escolha o dia:</label>
     <div id="calendar"></div>
 
-    <div id="secao-horarios">
-        <label id="label-horario">2. Escolha o horário:</label>
+    <div id="secao-horarios" style="display:none;">
+        <label>Escolha o horário:</label>
         <div class="grade-horarios" id="grade-horarios"></div>
     </div>
 
-    <label>3. Seus dados:</label>
+    <label>Seus dados:</label>
     <input type="text" id="nome" placeholder="Seu Nome Completo">
     <select id="servico">
         <option value="" disabled selected>Selecione o serviço</option>
@@ -56,14 +48,10 @@
         <option value="Pé">Pé</option>
         <option value="Pé e Mão">Pé e Mão</option>
         <option value="Spa dos Pés">Spa dos Pés</option>
-        <option value="Pé, Mão e Spa dos Pés">Pé, Mão e Spa dos Pés</option>
     </select>
 
     <button type="button" class="btn-confirmar" id="btn-finalizar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
-
-    <div class="admin-footer">
-        <button class="btn-admin-link" onclick="ativarAdmin()">Acesso Restrito</button>
-    </div>
+    <button class="btn-admin-link" onclick="ativarAdmin()">Acesso Restrito (Admin)</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
@@ -72,62 +60,43 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/pt-br.js"></script>
 
 <script>
-    // CONFIGURAÇÃO REFORÇADA
     const firebaseConfig = {
         apiKey: "AIzaSyAMLfQx1ip_-dwFeHzhkT82EUxcZ70G-Sc",
         authDomain: "agendaandreia-d7bd4.firebaseapp.com",
-        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com", 
+        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com",
         projectId: "agendaandreia-d7bd4",
         storageBucket: "agendaandreia-d7bd4.firebasestorage.app",
         messagingSenderId: "188530942210",
         appId: "1:188530942210:web:23351dae0487611fc6621b"
     };
 
-    // Inicializa o Firebase
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let dataSelecionada = "";
     let horaSelecionada = "";
     let isAdmin = false;
-    const horariosBase = ["08:30", "09:15", "10:00", "10:45", "11:30", "13:30", "14:15", "15:00", "15:45", "16:30", "17:15"];
     let bloqueios = {};
-    let diasLotados = [];
-    let calendar;
+    const horariosBase = ["08:30", "09:15", "10:00", "10:45", "11:30", "13:30", "14:15", "15:00", "15:45", "16:30", "17:15"];
 
-    // Escuta do Banco de Dados
-    db.ref('/').on('value', (snapshot) => {
-        const data = snapshot.val() || {};
-        bloqueios = data.bloqueios || {};
-        diasLotados = data.diasLotados || [];
-        if(calendar) calendar.render();
-        atualizarGrade();
-    }, (error) => {
-        console.error("Erro no Firebase:", error);
+    // Carregar dados do Firebase
+    db.ref('bloqueios').on('value', (snapshot) => {
+        bloqueios = snapshot.val() || {};
+        if (dataSelecionada) atualizarGrade();
     });
 
     document.addEventListener('DOMContentLoaded', function() {
         const calendarEl = document.getElementById('calendar');
-        calendar = new FullCalendar.Calendar(calendarEl, {
+        const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             locale: 'pt-br',
             height: 'auto',
-            selectable: true,
-            dayCellClassNames: function(arg) {
-                const dateStr = arg.date.toISOString().split('T')[0];
-                return (diasLotados && diasLotados.includes(dateStr)) ? ['dia-lotado'] : ['dia-disponivel'];
-            },
             dateClick: function(info) {
-                if (!isAdmin && diasLotados && diasLotados.includes(info.dateStr)) {
-                    alert("Agenda completa ou fechada para este dia!");
-                    return;
-                }
                 dataSelecionada = info.dateStr;
+                document.getElementById('secao-horarios').style.display = 'block';
                 atualizarGrade();
-                document.querySelectorAll('.fc-daygrid-day').forEach(el => el.style.border = 'none');
-                info.dayEl.style.border = '2px solid var(--rosa-escuro)';
+                document.querySelectorAll('.fc-daygrid-day').forEach(el => el.style.background = 'none');
+                info.dayEl.style.backgroundColor = '#f8bbd0';
             }
         });
         calendar.render();
@@ -135,29 +104,21 @@
 
     function atualizarGrade() {
         const grade = document.getElementById('grade-horarios');
-        if (!dataSelecionada) {
-            grade.style.display = 'none';
-            return;
-        }
-        grade.style.display = 'grid';
         grade.innerHTML = "";
-        
         const dataPt = dataSelecionada.split('-').reverse().join('/');
         
         horariosBase.forEach(h => {
-            const div = document.createElement('div');
             const chave = dataPt + "_" + h;
-            const estaBloqueado = bloqueios[chave] || (diasLotados && diasLotados.includes(dataSelecionada) && !isAdmin);
-
-            div.className = 'hora-item' + (estaBloqueado ? ' bloqueado' : '');
+            const estaOcupado = bloqueios[chave];
+            const div = document.createElement('div');
+            div.className = 'hora-item' + (estaOcupado ? ' bloqueado' : '');
             div.innerText = h;
-            if(horaSelecionada === h && !estaBloqueado) div.classList.add('selected');
             
             div.onclick = function() {
                 if (isAdmin) {
-                    if (bloqueios[chave]) db.ref('bloqueios/'+chave).remove();
-                    else db.ref('bloqueios/'+chave).set(true);
-                } else if (!estaBloqueado) {
+                    if (estaOcupado) db.ref('bloqueios/' + chave).remove();
+                    else db.ref('bloqueios/' + chave).set(true);
+                } else if (!estaOcupado) {
                     document.querySelectorAll('.hora-item').forEach(el => el.classList.remove('selected'));
                     div.classList.add('selected');
                     horaSelecionada = h;
@@ -167,60 +128,29 @@
         });
     }
 
-    function toggleBloqueioDia() {
-        if (!dataSelecionada) return;
-        if(!diasLotados) diasLotados = [];
-        const index = diasLotados.indexOf(dataSelecionada);
-        if (index > -1) diasLotados.splice(index, 1);
-        else diasLotados.push(dataSelecionada);
-        db.ref('diasLotados').set(diasLotados);
-    }
-
     function ativarAdmin() {
-        const senha = prompt("Senha:");
-        if (senha === "1234") {
+        if (prompt("Senha:") === "1234") {
             isAdmin = true;
             document.getElementById('aviso-admin').style.display = 'block';
-            document.getElementById('btn-sair-admin').style.display = 'block';
-            document.getElementById('btn-bloquear-dia').style.display = 'block';
-            atualizarGrade();
+            alert("Modo Admin: Clique nos horários para bloquear/liberar.");
         }
-    }
-
-    function desativarAdmin() {
-        isAdmin = false;
-        document.getElementById('aviso-admin').style.display = 'none';
-        document.getElementById('btn-sair-admin').style.display = 'none';
-        document.getElementById('btn-bloquear-dia').style.display = 'none';
-        atualizarGrade();
     }
 
     function enviarAgendamento() {
         const nome = document.getElementById('nome').value;
         const servico = document.getElementById('servico').value;
-
         if (!dataSelecionada || !horaSelecionada || !nome || !servico) {
-            alert("Por favor, preencha todos os campos."); return;
+            alert("Preencha todos os campos!"); return;
         }
-
-        const btn = document.getElementById('btn-finalizar');
-        btn.innerText = "Salvando...";
-        btn.disabled = true;
 
         const dataPt = dataSelecionada.split('-').reverse().join('/');
         const chave = dataPt + "_" + horaSelecionada;
 
-        db.ref('bloqueios/' + chave).set(true)
-        .then(() => {
+        db.ref('bloqueios/' + chave).set(true).then(() => {
             const texto = *NOVO AGENDAMENTO*\n*Cliente:* ${nome}\n*Serviço:* ${servico}\n*Data:* ${dataPt}\n*Horário:* ${horaSelecionada};
-            window.open(https://wa.me/5545988157875?text=${encodeURIComponent(texto)}, '_blank');
-            btn.innerText = "Finalizar Agendamento";
-            btn.disabled = false;
-        })
-        .catch((err) => {
-            alert("Erro ao salvar! Verifique as permissões do Firebase.");
-            btn.disabled = false;
-        });
+            window.open(https://wa.me/5545988157875?text=${encodeURIComponent(texto)});
+            location.reload();
+        }).catch(err => alert("Erro ao salvar. Verifique as 'Rules' do Firebase."));
     }
 </script>
 </body>
