@@ -72,45 +72,51 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/pt-br.js"></script>
 
 <script>
-    // CONFIGURAÇÃO COM SEU LINK COPIADO
-    var firebaseConfig = {
+    // CONFIGURAÇÃO REFORÇADA
+    const firebaseConfig = {
         apiKey: "AIzaSyAMLfQx1ip_-dwFeHzhkT82EUxcZ70G-Sc",
         authDomain: "agendaandreia-d7bd4.firebaseapp.com",
-        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com/",
+        databaseURL: "https://agendaandreia-d7bd4-default-rtdb.firebaseio.com", 
         projectId: "agendaandreia-d7bd4",
         storageBucket: "agendaandreia-d7bd4.firebasestorage.app",
         messagingSenderId: "188530942210",
         appId: "1:188530942210:web:23351dae0487611fc6621b"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    var db = firebase.database();
+    // Inicializa o Firebase
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
 
-    var dataSelecionada = "";
-    var horaSelecionada = "";
-    var isAdmin = false;
-    var horariosBase = ["08:30", "09:15", "10:00", "10:45", "11:30", "13:30", "14:15", "15:00", "15:45", "16:30", "17:15"];
-    var bloqueios = {};
-    var diasLotados = [];
-    var calendar;
+    let dataSelecionada = "";
+    let horaSelecionada = "";
+    let isAdmin = false;
+    const horariosBase = ["08:30", "09:15", "10:00", "10:45", "11:30", "13:30", "14:15", "15:00", "15:45", "16:30", "17:15"];
+    let bloqueios = {};
+    let diasLotados = [];
+    let calendar;
 
-    db.ref('/').on('value', function(snapshot) {
-        var data = snapshot.val() || {};
+    // Escuta do Banco de Dados
+    db.ref('/').on('value', (snapshot) => {
+        const data = snapshot.val() || {};
         bloqueios = data.bloqueios || {};
         diasLotados = data.diasLotados || [];
         if(calendar) calendar.render();
         atualizarGrade();
+    }, (error) => {
+        console.error("Erro no Firebase:", error);
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
+        const calendarEl = document.getElementById('calendar');
         calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             locale: 'pt-br',
             height: 'auto',
+            selectable: true,
             dayCellClassNames: function(arg) {
-                var d = arg.date;
-                var dateStr = d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
+                const dateStr = arg.date.toISOString().split('T')[0];
                 return (diasLotados && diasLotados.includes(dateStr)) ? ['dia-lotado'] : ['dia-disponivel'];
             },
             dateClick: function(info) {
@@ -128,16 +134,20 @@
     });
 
     function atualizarGrade() {
-        if (!dataSelecionada) return;
-        var grade = document.getElementById('grade-horarios');
+        const grade = document.getElementById('grade-horarios');
+        if (!dataSelecionada) {
+            grade.style.display = 'none';
+            return;
+        }
         grade.style.display = 'grid';
         grade.innerHTML = "";
-        var dataPt = dataSelecionada.split('-').reverse().join('/');
         
-        horariosBase.forEach(function(h) {
-            var div = document.createElement('div');
-            var chave = dataPt + "_" + h;
-            var estaBloqueado = bloqueios[chave] || (diasLotados && diasLotados.includes(dataSelecionada) && !isAdmin);
+        const dataPt = dataSelecionada.split('-').reverse().join('/');
+        
+        horariosBase.forEach(h => {
+            const div = document.createElement('div');
+            const chave = dataPt + "_" + h;
+            const estaBloqueado = bloqueios[chave] || (diasLotados && diasLotados.includes(dataSelecionada) && !isAdmin);
 
             div.className = 'hora-item' + (estaBloqueado ? ' bloqueado' : '');
             div.innerText = h;
@@ -160,14 +170,14 @@
     function toggleBloqueioDia() {
         if (!dataSelecionada) return;
         if(!diasLotados) diasLotados = [];
-        var index = diasLotados.indexOf(dataSelecionada);
+        const index = diasLotados.indexOf(dataSelecionada);
         if (index > -1) diasLotados.splice(index, 1);
         else diasLotados.push(dataSelecionada);
         db.ref('diasLotados').set(diasLotados);
     }
 
     function ativarAdmin() {
-        var senha = prompt("Senha:");
+        const senha = prompt("Senha:");
         if (senha === "1234") {
             isAdmin = true;
             document.getElementById('aviso-admin').style.display = 'block';
@@ -186,31 +196,29 @@
     }
 
     function enviarAgendamento() {
-        var nome = document.getElementById('nome').value;
-        var servico = document.getElementById('servico').value;
+        const nome = document.getElementById('nome').value;
+        const servico = document.getElementById('servico').value;
 
         if (!dataSelecionada || !horaSelecionada || !nome || !servico) {
-            alert("Preencha seu nome e escolha o serviço."); return;
+            alert("Por favor, preencha todos os campos."); return;
         }
 
-        var btn = document.getElementById('btn-finalizar');
-        btn.innerText = "Confirmando...";
+        const btn = document.getElementById('btn-finalizar');
+        btn.innerText = "Salvando...";
         btn.disabled = true;
 
-        var dataPt = dataSelecionada.split('-').reverse().join('/');
-        var chave = dataPt + "_" + horaSelecionada;
+        const dataPt = dataSelecionada.split('-').reverse().join('/');
+        const chave = dataPt + "_" + horaSelecionada;
 
-        // GRAVAÇÃO DIRETA
         db.ref('bloqueios/' + chave).set(true)
         .then(() => {
-            var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataPt+"\n*Horário:* "+horaSelecionada;
-            window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
+            const texto = *NOVO AGENDAMENTO*\n*Cliente:* ${nome}\n*Serviço:* ${servico}\n*Data:* ${dataPt}\n*Horário:* ${horaSelecionada};
+            window.open(https://wa.me/5545988157875?text=${encodeURIComponent(texto)}, '_blank');
             btn.innerText = "Finalizar Agendamento";
             btn.disabled = false;
         })
-        .catch((error) => {
-            alert("Erro ao gravar no banco. Verifique as 'Rules' no Firebase.");
-            btn.innerText = "Finalizar Agendamento";
+        .catch((err) => {
+            alert("Erro ao salvar! Verifique as permissões do Firebase.");
             btn.disabled = false;
         });
     }
