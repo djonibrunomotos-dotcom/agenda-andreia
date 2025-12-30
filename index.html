@@ -56,10 +56,10 @@
         <option value="Pé">Pé</option>
         <option value="Pé e Mão">Pé e Mão</option>
         <option value="Spa dos Pés">Spa dos Pés</option>
-        <option value="Combo Completo">Pé, Mão e Spa</option>
+        <option value="Pé, Mão e Spa dos Pés">Pé, Mão e Spa dos Pés</option>
     </select>
 
-    <button type="button" class="btn-confirmar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
+    <button type="button" class="btn-confirmar" id="btn-finalizar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
 
     <div class="admin-footer">
         <button class="btn-admin-link" onclick="ativarAdmin()">Acesso Restrito</button>
@@ -93,7 +93,7 @@
     var diasLotados = [];
     var calendar;
 
-    // Sincronização em Tempo Real
+    // Escuta em tempo real qualquer mudança no banco
     db.ref('/').on('value', function(snapshot) {
         var data = snapshot.val() || {};
         bloqueios = data.bloqueios || {};
@@ -114,7 +114,10 @@
                 return diasLotados.includes(dateStr) ? ['dia-lotado'] : ['dia-disponivel'];
             },
             dateClick: function(info) {
-                if (!isAdmin && diasLotados.includes(info.dateStr)) return;
+                if (!isAdmin && diasLotados.includes(info.dateStr)) {
+                    alert("Agenda completa ou fechada para este dia!");
+                    return;
+                }
                 dataSelecionada = info.dateStr;
                 atualizarGrade();
                 document.querySelectorAll('.fc-daygrid-day').forEach(el => el.style.border = 'none');
@@ -134,7 +137,7 @@
         horariosBase.forEach(function(h) {
             var div = document.createElement('div');
             var chave = dataPt + "_" + h;
-            var estaBloqueado = bloqueios[chave] || diasLotados.includes(dataSelecionada);
+            var estaBloqueado = bloqueios[chave] || (diasLotados.includes(dataSelecionada) && !isAdmin);
 
             div.className = 'hora-item' + (estaBloqueado ? ' bloqueado' : '');
             div.innerText = h;
@@ -142,8 +145,11 @@
             
             div.onclick = function() {
                 if (isAdmin) {
-                    if (bloqueios[chave]) db.ref('bloqueios/'+chave).remove();
-                    else db.ref('bloqueios/'+chave).set(true);
+                    if (bloqueios[chave]) {
+                        db.ref('bloqueios/' + chave).remove();
+                    } else {
+                        db.ref('bloqueios/' + chave).set(true);
+                    }
                 } else if (!estaBloqueado) {
                     document.querySelectorAll('.hora-item').forEach(el => el.classList.remove('selected'));
                     div.classList.add('selected');
@@ -157,8 +163,11 @@
     function toggleBloqueioDia() {
         if (!dataSelecionada) return;
         var index = diasLotados.indexOf(dataSelecionada);
-        if (index > -1) diasLotados.splice(index, 1);
-        else diasLotados.push(dataSelecionada);
+        if (index > -1) {
+            diasLotados.splice(index, 1);
+        } else {
+            diasLotados.push(dataSelecionada);
+        }
         db.ref('diasLotados').set(diasLotados);
     }
 
@@ -169,6 +178,7 @@
             document.getElementById('aviso-admin').style.display = 'block';
             document.getElementById('btn-sair-admin').style.display = 'block';
             document.getElementById('btn-bloquear-dia').style.display = 'block';
+            atualizarGrade();
         }
     }
 
@@ -181,20 +191,38 @@
     }
 
     function enviarAgendamento() {
-        if (!dataSelecionada || !horaSelecionada) { alert("Escolha dia e hora."); return; }
         var nome = document.getElementById('nome').value;
         var servico = document.getElementById('servico').value;
-        if(!nome || !servico) { alert("Preencha nome e serviço."); return; }
-        
+
+        if (!dataSelecionada || !horaSelecionada || !nome || !servico) {
+            alert("Por favor, preencha todos os campos e escolha data e hora.");
+            return;
+        }
+
+        var btn = document.getElementById('btn-finalizar');
+        btn.innerText = "Salvando...";
+        btn.disabled = true;
+
         var dataPt = dataSelecionada.split('-').reverse().join('/');
         var chave = dataPt + "_" + horaSelecionada;
-        
-        // Bloqueia e abre o WhatsApp
-        db.ref('bloqueios/' + chave).set(true).then(() => {
-            var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataPt+"\n*Horário:* "+horaSelecionada;
-            window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
-        }).catch(() => {
-            alert("Erro ao salvar. Verifique se as regras do Firebase estão como 'true'.");
+
+        // COMANDO DE SALVAMENTO PRIORITÁRIO
+        db.ref('bloqueios/' + chave).set(true, function(error) {
+            if (error) {
+                alert("Erro ao salvar agendamento. Tente novamente.");
+                btn.innerText = "Finalizar Agendamento";
+                btn.disabled = false;
+            } else {
+                // SÓ ABRE O WHATSAPP SE SALVOU NO BANCO
+                var texto = "NOVO AGENDAMENTO\n*Cliente:* " + nome + "\n*Serviço:* " + servico + "\n*Data:* " + dataPt + "\n*Horário:* " + horaSelecionada;
+                window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
+                
+                // Reseta para a próxima pessoa
+                btn.innerText = "Finalizar Agendamento";
+                btn.disabled = false;
+                horaSelecionada = "";
+                document.getElementById('nome').value = "";
+            }
         });
     }
 </script>
