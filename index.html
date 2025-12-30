@@ -19,7 +19,7 @@
         .hora-item { padding: 10px; background: white; border: 1px solid var(--rosa); border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
         .hora-item.selected { background: var(--rosa-escuro); color: white; border-color: var(--rosa-escuro); }
         .hora-item.bloqueado { background: #e0e0e0; color: #9e9e9e; border-color: #bdbdbd; cursor: not-allowed; text-decoration: line-through; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-family: 'Poppins'; font-size: 16px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; }
         .btn-confirmar { width: 100%; background-color: var(--verde); color: white; padding: 15px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .badge-admin { display: none; background: #ff5252; color: white; padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 10px; text-align: center; font-weight: bold; }
         #btn-sair-admin, #btn-bloquear-dia { display: none; border: none; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
@@ -33,7 +33,6 @@
 
 <header>
     <h1 style="font-family: 'Playfair Display'; margin: 0; font-size: 1.6rem;">Agendamento Andreia Kubichen</h1>
-    <p style="margin: 5px 0 0; font-size: 0.9rem;">Agendamento Prático</p>
 </header>
 
 <div class="container">
@@ -50,14 +49,12 @@
     </div>
 
     <label>3. Seus dados:</label>
-    <input type="text" id="nome" placeholder="Nome Completo">
+    <input type="text" id="nome" placeholder="Seu Nome">
     <select id="servico">
         <option value="" disabled selected>Selecione o serviço</option>
         <option value="Mão">Mão</option>
         <option value="Pé">Pé</option>
-        <option value="Spa dos Pés">Spa dos Pés</option>
         <option value="Pé e Mão">Pé e Mão</option>
-        <option value="Combo Completo">Pé, Mão e Spa</option>
     </select>
 
     <button type="button" class="btn-confirmar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
@@ -94,12 +91,11 @@
     var diasLotados = [];
     var calendar;
 
-    // Conexão direta com o banco
     db.ref('/').on('value', function(snapshot) {
         var data = snapshot.val() || {};
         bloqueios = data.bloqueios || {};
         diasLotados = data.diasLotados || [];
-        if(calendar) { calendar.render(); }
+        if(calendar) calendar.render();
         atualizarGrade();
     });
 
@@ -108,7 +104,6 @@
         calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             locale: 'pt-br',
-            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
             height: 'auto',
             dayCellClassNames: function(arg) {
                 var d = arg.date;
@@ -116,12 +111,10 @@
                 return diasLotados.includes(dateStr) ? ['dia-lotado'] : ['dia-disponivel'];
             },
             dateClick: function(info) {
-                if (!isAdmin && diasLotados.includes(info.dateStr)) {
-                    alert("Agenda lotada."); return;
-                }
+                if (!isAdmin && diasLotados.includes(info.dateStr)) return;
                 dataSelecionada = info.dateStr;
                 atualizarGrade();
-                document.querySelectorAll('.fc-daygrid-day').forEach(function(el) { el.style.border = 'none'; });
+                document.querySelectorAll('.fc-daygrid-day').forEach(el => el.style.border = 'none');
                 info.dayEl.style.border = '2px solid var(--rosa-escuro)';
             }
         });
@@ -146,8 +139,8 @@
             
             div.onclick = function() {
                 if (isAdmin) {
-                    if (bloqueios[chave]) { db.ref('bloqueios/'+chave).remove(); } 
-                    else { db.ref('bloqueios/'+chave).set(true); }
+                    if (bloqueios[chave]) db.ref('bloqueios/'+chave).remove();
+                    else db.ref('bloqueios/'+chave).set(true);
                 } else if (!estaBloqueado) {
                     document.querySelectorAll('.hora-item').forEach(el => el.classList.remove('selected'));
                     div.classList.add('selected');
@@ -161,8 +154,8 @@
     function toggleBloqueioDia() {
         if (!dataSelecionada) return;
         var index = diasLotados.indexOf(dataSelecionada);
-        if (index > -1) { diasLotados.splice(index, 1); } 
-        else { diasLotados.push(dataSelecionada); }
+        if (index > -1) diasLotados.splice(index, 1);
+        else diasLotados.push(dataSelecionada);
         db.ref('diasLotados').set(diasLotados);
     }
 
@@ -189,8 +182,24 @@
         var nome = document.getElementById('nome').value;
         var servico = document.getElementById('servico').value;
         if(!nome || !servico) { alert("Preencha nome e serviço."); return; }
-        var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataSelecionada.split('-').reverse().join('/')+"\n*Horário:* "+horaSelecionada;
-        window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
+        
+        // --- PARTE NOVA: SALVA NO BANCO ANTES DE IR PRO WHATSAPP ---
+        var dataPt = dataSelecionada.split('-').reverse().join('/');
+        var chave = dataPt + "_" + horaSelecionada;
+        
+        // Registra o bloqueio no Firebase para ninguém mais pegar esse horário
+        db.ref('bloqueios/' + chave).set({
+            cliente: nome,
+            servico: servico,
+            data: dataPt,
+            horario: horaSelecionada
+        }).then(() => {
+            // Após salvar com sucesso, abre o WhatsApp
+            var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataPt+"\n*Horário:* "+horaSelecionada;
+            window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
+        }).catch((error) => {
+            alert("Erro ao salvar agendamento. Tente novamente.");
+        });
     }
 </script>
 </body>
