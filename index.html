@@ -49,12 +49,14 @@
     </div>
 
     <label>3. Seus dados:</label>
-    <input type="text" id="nome" placeholder="Seu Nome">
+    <input type="text" id="nome" placeholder="Seu Nome Completo">
     <select id="servico">
         <option value="" disabled selected>Selecione o serviço</option>
         <option value="Mão">Mão</option>
         <option value="Pé">Pé</option>
         <option value="Pé e Mão">Pé e Mão</option>
+        <option value="Spa dos Pés">Spa dos Pés</option>
+        <option value="Combo Completo">Pé, Mão e Spa</option>
     </select>
 
     <button type="button" class="btn-confirmar" onclick="enviarAgendamento()">Finalizar Agendamento</button>
@@ -91,6 +93,7 @@
     var diasLotados = [];
     var calendar;
 
+    // Sincronização em Tempo Real
     db.ref('/').on('value', function(snapshot) {
         var data = snapshot.val() || {};
         bloqueios = data.bloqueios || {};
@@ -183,22 +186,15 @@
         var servico = document.getElementById('servico').value;
         if(!nome || !servico) { alert("Preencha nome e serviço."); return; }
         
-        // --- PARTE NOVA: SALVA NO BANCO ANTES DE IR PRO WHATSAPP ---
         var dataPt = dataSelecionada.split('-').reverse().join('/');
         var chave = dataPt + "_" + horaSelecionada;
         
-        // Registra o bloqueio no Firebase para ninguém mais pegar esse horário
-        db.ref('bloqueios/' + chave).set({
-            cliente: nome,
-            servico: servico,
-            data: dataPt,
-            horario: horaSelecionada
-        }).then(() => {
-            // Após salvar com sucesso, abre o WhatsApp
+        // Bloqueia e abre o WhatsApp
+        db.ref('bloqueios/' + chave).set(true).then(() => {
             var texto = "NOVO AGENDAMENTO\n*Cliente:* "+nome+"\n*Serviço:* "+servico+"\n*Data:* "+dataPt+"\n*Horário:* "+horaSelecionada;
             window.open("https://wa.me/5545988157875?text=" + encodeURIComponent(texto), '_blank');
-        }).catch((error) => {
-            alert("Erro ao salvar agendamento. Tente novamente.");
+        }).catch(() => {
+            alert("Erro ao salvar. Verifique se as regras do Firebase estão como 'true'.");
         });
     }
 </script>
